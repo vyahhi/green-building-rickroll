@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import sys
@@ -205,11 +206,12 @@ def preview(frame: Frame) -> str:
     )
 
 
-def play(endpoint: str, fps: float, seconds: float, dry_run: bool) -> int:
+def play(endpoint: str, fps: float, seconds: float, dry_run: bool, loop: bool = False) -> int:
     display = WebDisplay(endpoint)
     total = max(1, round(seconds * fps))
+    frame_numbers = itertools.count() if loop else range(total)
     deadline = time.monotonic()
-    for index, frame in zip(range(total), frames(fps)):
+    for index, frame in zip(frame_numbers, frames(fps)):
         if dry_run:
             sys.stdout.write("\x1b[H\x1b[2J" + preview(frame) + "\n")
             sys.stdout.flush()
@@ -229,6 +231,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="frame POST endpoint")
     parser.add_argument("--fps", type=float, default=6.0, help="frames per second (default: 6)")
     parser.add_argument("--seconds", type=float, default=30.0, help="duration (default: 30)")
+    parser.add_argument("--loop", action="store_true", help="play continuously until interrupted")
     parser.add_argument("--dry-run", action="store_true", help="preview in the terminal without POSTing")
     args = parser.parse_args()
     if not 1 <= args.fps <= 30:
@@ -240,4 +243,8 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     options = parse_args()
-    raise SystemExit(play(options.endpoint, options.fps, options.seconds, options.dry_run))
+    try:
+        exit_code = play(options.endpoint, options.fps, options.seconds, options.dry_run, options.loop)
+    except KeyboardInterrupt:
+        exit_code = 0
+    raise SystemExit(exit_code)

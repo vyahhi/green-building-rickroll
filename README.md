@@ -18,6 +18,12 @@ without sending anything:
 python3 rickroll.py --dry-run --seconds 10
 ```
 
+Keep the animation running continuously until you press Ctrl-C:
+
+```bash
+python3 rickroll.py --loop
+```
+
 Duration, frame rate, and destination are configurable:
 
 ```bash
