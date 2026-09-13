@@ -22,14 +22,14 @@ RGB = tuple[int, int, int]
 Frame = list[list[list[int]]]
 
 BLACK: RGB = (1, 1, 3)
-HAIR: RGB = (92, 30, 8)
-HAIR_LIGHT: RGB = (120, 52, 10)
-SKIN: RGB = (108, 58, 36)
-SKIN_SHADOW: RGB = (68, 28, 20)
+HAIR: RGB = (125, 43, 12)
+HAIR_LIGHT: RGB = (155, 72, 18)
+SKIN: RGB = (145, 78, 48)
+SKIN_SHADOW: RGB = (90, 38, 26)
 SHIRT: RGB = (4, 6, 10)
-COAT: RGB = (88, 67, 42)
-COAT_LIGHT: RGB = (112, 88, 55)
-MIC: RGB = (78, 84, 92)
+COAT: RGB = (118, 90, 56)
+COAT_LIGHT: RGB = (145, 112, 68)
+MIC: RGB = (105, 112, 125)
 
 
 def blank(color: RGB = BLACK) -> Frame:
@@ -64,7 +64,8 @@ FONT = {
     "E": ("111", "100", "110", "100", "111"),
     "G": ("111", "100", "101", "101", "111"),
     "I": ("111", "010", "010", "010", "111"),
-    "N": ("101", "111", "111", "111", "101"),
+    # N is deliberately four columns wide so its diagonal remains legible.
+    "N": ("1001", "1101", "1101", "1011", "1001"),
     "O": ("111", "101", "101", "101", "111"),
     "P": ("110", "101", "110", "100", "100"),
     "R": ("110", "101", "110", "101", "101"),
@@ -74,11 +75,11 @@ FONT = {
 }
 
 WORD_CARDS = (
-    ("NEVER", (16, 1, 4)),
-    ("GONNA", (1, 5, 18)),
-    ("GIVE", (12, 1, 16)),
-    ("YOU", (1, 14, 11)),
-    ("UP", (18, 5, 1)),
+    ("NEVER", (22, 2, 6)),
+    ("GONNA", (2, 8, 24)),
+    ("GIVE", (17, 2, 22)),
+    ("YOU", (2, 20, 16)),
+    ("UP", (24, 8, 2)),
 )
 
 
@@ -87,30 +88,36 @@ def solid(color: RGB) -> Frame:
 
 
 def draw_text_line(frame: Frame, text: str, y: int) -> None:
-    spacing = 1 if len(text) < 3 else 0
-    width = len(text) * 3 + max(0, len(text) - 1) * spacing
+    glyph_widths = [len(FONT[letter][0]) for letter in text]
+    spacing = 1
+    width = sum(glyph_widths) + max(0, len(text) - 1) * spacing
+    if width > WIDTH:
+        spacing = 0
+        width = sum(glyph_widths)
+    if width > WIDTH:
+        raise ValueError(f"text line {text!r} is wider than the display")
     x = (WIDTH - width) // 2
     # Bright enough to read, but below the simulator's heavy bloom threshold.
-    colors = ((100, 100, 100), (105, 82, 15), (28, 82, 100))
+    colors = ((135, 135, 135), (140, 108, 20), (38, 108, 132))
     for letter_index, letter in enumerate(text):
         color = colors[letter_index % len(colors)]
         for row, pattern in enumerate(FONT[letter]):
             for column, value in enumerate(pattern):
                 if value == "1":
                     pixel(frame, x + column, y + row, color)
-        x += 3 + spacing
+        x += glyph_widths[letter_index] + spacing
 
 
 def word_card(word: str, background: RGB) -> Frame:
     frame = solid(background)
     lines = {
         "NEVER": ("NE", "VER"),
-        "GONNA": ("GO", "NNA"),
+        "GONNA": ("GO", "NN", "A"),
         "GIVE": ("GI", "VE"),
         "YOU": ("YOU",),
         "UP": ("UP",),
     }[word]
-    positions = (2, 10) if len(lines) == 2 else (6,)
+    positions = {1: (6,), 2: (2, 10), 3: (0, 6, 12)}[len(lines)]
     for text, y in zip(lines, positions):
         draw_text_line(frame, text, y)
     return frame
@@ -119,8 +126,8 @@ def word_card(word: str, background: RGB) -> Frame:
 def stage(frame_number: int) -> Frame:
     # A nearly solid background survives the building renderer much better than
     # subtle gradients. The side bars provide visible motion without visual noise.
-    frame = solid((1, 7, 14))
-    accent = (4, 30, 46) if frame_number % 2 else (5, 20, 34)
+    frame = solid((2, 10, 20))
+    accent = (6, 42, 65) if frame_number % 2 else (7, 28, 46)
     for y in range(HEIGHT):
         pixel(frame, 0, y, accent)
         pixel(frame, 8, y, accent)
@@ -142,7 +149,7 @@ def draw_rick(frame: Frame, phase: int) -> None:
     pixel(frame, 5, 4, (20, 18, 25))
     pixel(frame, 4, 5, SKIN_SHADOW)
     pixel(frame, 3, 6, SKIN_SHADOW)
-    pixel(frame, 4, 7, (110, 104, 92))
+    pixel(frame, 4, 7, (145, 137, 120))
     pixel(frame, 5, 6, SKIN_SHADOW)
     for x in range(3, 6):
         pixel(frame, x, 8, SKIN)

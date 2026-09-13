@@ -27,6 +27,12 @@ class RickrollTests(unittest.TestCase):
             rickroll.validate(card)
         self.assertEqual(len({json.dumps(card) for card in cards}), 5)
 
+    def test_n_has_a_readable_diagonal_and_extra_width(self):
+        glyph = rickroll.FONT["N"]
+        self.assertTrue(all(len(row) == 4 for row in glyph))
+        diagonal = (0, 1, 1, 2, 3)
+        self.assertEqual([glyph[row][column] for row, column in enumerate(diagonal)], ["1"] * 5)
+
 
 if __name__ == "__main__":
     unittest.main()
