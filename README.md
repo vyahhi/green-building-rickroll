@@ -2,6 +2,9 @@
 
 A dependency-free, procedural pixel-art Rick Astley dance for the MIT Green
 Building simulator. Every frame is exactly 17 rows × 9 columns × `[r, g, b]`.
+The loop alternates an oversized Rick-and-microphone portrait with crisp lyric
+cards spelling `NEVER / GONNA / GIVE / YOU / UP`. Colors are tuned to remain
+legible through the simulator's building-scale bloom effect.
 
 ## Play it
 

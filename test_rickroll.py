@@ -21,6 +21,12 @@ class RickrollTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rickroll.validate([[[0, 0, 0]]])
 
+    def test_every_lyric_word_has_a_distinct_card(self):
+        cards = [rickroll.word_card(word, color) for word, color in rickroll.WORD_CARDS]
+        for card in cards:
+            rickroll.validate(card)
+        self.assertEqual(len({json.dumps(card) for card in cards}), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

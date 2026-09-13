@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
-import math
 import sys
 import time
 import urllib.error
@@ -22,17 +21,15 @@ DEFAULT_ENDPOINT = "https://sundai.willsarg.com/api/i/quiet-fox/frame"
 RGB = tuple[int, int, int]
 Frame = list[list[list[int]]]
 
-BLACK: RGB = (3, 3, 8)
-HAIR: RGB = (205, 75, 30)
-HAIR_LIGHT: RGB = (255, 132, 51)
-SKIN: RGB = (255, 174, 122)
-SKIN_SHADOW: RGB = (190, 93, 68)
-SHIRT: RGB = (18, 24, 35)
-COAT: RGB = (224, 191, 145)
-COAT_LIGHT: RGB = (255, 225, 174)
-TROUSERS: RGB = (30, 38, 60)
-SHOE: RGB = (5, 5, 10)
-MIC: RGB = (215, 223, 235)
+BLACK: RGB = (1, 1, 3)
+HAIR: RGB = (92, 30, 8)
+HAIR_LIGHT: RGB = (120, 52, 10)
+SKIN: RGB = (108, 58, 36)
+SKIN_SHADOW: RGB = (68, 28, 20)
+SHIRT: RGB = (4, 6, 10)
+COAT: RGB = (88, 67, 42)
+COAT_LIGHT: RGB = (112, 88, 55)
+MIC: RGB = (78, 84, 92)
 
 
 def blank(color: RGB = BLACK) -> Frame:
@@ -62,107 +59,137 @@ def line(frame: Frame, x0: int, y0: int, x1: int, y1: int, color: RGB) -> None:
             y0 += sy
 
 
-def stage(frame_number: int) -> Frame:
-    frame = blank()
-    pulse = (math.sin(frame_number * 0.45) + 1.0) / 2.0
-    blue = int(20 + 42 * pulse)
+FONT = {
+    "A": ("010", "101", "111", "101", "101"),
+    "E": ("111", "100", "110", "100", "111"),
+    "G": ("111", "100", "101", "101", "111"),
+    "I": ("111", "010", "010", "010", "111"),
+    "N": ("101", "111", "111", "111", "101"),
+    "O": ("111", "101", "101", "101", "111"),
+    "P": ("110", "101", "110", "100", "100"),
+    "R": ("110", "101", "110", "101", "101"),
+    "U": ("101", "101", "101", "101", "111"),
+    "V": ("101", "101", "101", "101", "010"),
+    "Y": ("101", "101", "010", "010", "010"),
+}
 
-    # Blue video-set backdrop, a warm window, and alternating spotlights.
-    for y in range(HEIGHT - 2):
-        for x in range(WIDTH):
-            frame[y][x] = [7 + x * 2, 14 + y, blue + y * 2]
-    for y in range(2, 7):
-        for x in range(1, 4):
-            pixel(frame, x, y, (115 + y * 8, 72 + y * 5, 40))
-    beam_x = 1 + (frame_number // 2) % 7
-    for y in range(HEIGHT - 2):
-        pixel(frame, max(0, min(WIDTH - 1, beam_x + (y - 7) // 5)), y, (28, 45, 88))
-    for x in range(WIDTH):
-        pixel(frame, x, HEIGHT - 2, (46, 35, 48))
-        pixel(frame, x, HEIGHT - 1, (18, 15, 25))
+WORD_CARDS = (
+    ("NEVER", (16, 1, 4)),
+    ("GONNA", (1, 5, 18)),
+    ("GIVE", (12, 1, 16)),
+    ("YOU", (1, 14, 11)),
+    ("UP", (18, 5, 1)),
+)
+
+
+def solid(color: RGB) -> Frame:
+    return blank(color)
+
+
+def draw_text_line(frame: Frame, text: str, y: int) -> None:
+    spacing = 1 if len(text) < 3 else 0
+    width = len(text) * 3 + max(0, len(text) - 1) * spacing
+    x = (WIDTH - width) // 2
+    # Bright enough to read, but below the simulator's heavy bloom threshold.
+    colors = ((100, 100, 100), (105, 82, 15), (28, 82, 100))
+    for letter_index, letter in enumerate(text):
+        color = colors[letter_index % len(colors)]
+        for row, pattern in enumerate(FONT[letter]):
+            for column, value in enumerate(pattern):
+                if value == "1":
+                    pixel(frame, x + column, y + row, color)
+        x += 3 + spacing
+
+
+def word_card(word: str, background: RGB) -> Frame:
+    frame = solid(background)
+    lines = {
+        "NEVER": ("NE", "VER"),
+        "GONNA": ("GO", "NNA"),
+        "GIVE": ("GI", "VE"),
+        "YOU": ("YOU",),
+        "UP": ("UP",),
+    }[word]
+    positions = (2, 10) if len(lines) == 2 else (6,)
+    for text, y in zip(lines, positions):
+        draw_text_line(frame, text, y)
+    return frame
+
+
+def stage(frame_number: int) -> Frame:
+    # A nearly solid background survives the building renderer much better than
+    # subtle gradients. The side bars provide visible motion without visual noise.
+    frame = solid((1, 7, 14))
+    accent = (4, 30, 46) if frame_number % 2 else (5, 20, 34)
+    for y in range(HEIGHT):
+        pixel(frame, 0, y, accent)
+        pixel(frame, 8, y, accent)
     return frame
 
 
 def draw_rick(frame: Frame, phase: int) -> None:
-    sway = (-1, 0, 1, 0)[phase]
-    cx = 4 + sway
-    bob = 1 if phase == 2 else 0
+    # Oversized head: orange quiff, face, eyes, nose, and smile.
+    for x in range(3, 6):
+        pixel(frame, x, 0, HAIR_LIGHT)
+    for x in range(2, 7):
+        pixel(frame, x, 1, HAIR)
+        pixel(frame, x, 2, HAIR if x in (2, 3, 6) else SKIN)
+    for y in range(3, 8):
+        for x in range(2, 7):
+            pixel(frame, x, y, SKIN)
+    pixel(frame, 2, 3, HAIR)
+    pixel(frame, 3, 4, (20, 18, 25))
+    pixel(frame, 5, 4, (20, 18, 25))
+    pixel(frame, 4, 5, SKIN_SHADOW)
+    pixel(frame, 3, 6, SKIN_SHADOW)
+    pixel(frame, 4, 7, (110, 104, 92))
+    pixel(frame, 5, 6, SKIN_SHADOW)
+    for x in range(3, 6):
+        pixel(frame, x, 8, SKIN)
 
-    # Hair and face: the orange quiff is the key silhouette at this scale.
-    pixel(frame, cx - 1, 1 + bob, HAIR_LIGHT)
-    pixel(frame, cx, 1 + bob, HAIR)
-    pixel(frame, cx + 1, 2 + bob, HAIR)
-    for x in range(cx - 1, cx + 2):
-        pixel(frame, x, 2 + bob, HAIR)
-        pixel(frame, x, 3 + bob, SKIN)
-        pixel(frame, x, 4 + bob, SKIN_SHADOW)
-    pixel(frame, cx, 3 + bob, (255, 218, 174))
-    pixel(frame, cx - 1, 3 + bob, (35, 25, 28))
-
-    # Black turtleneck, tan coat, and highlights.
-    pixel(frame, cx, 5 + bob, SHIRT)
-    for y in range(6 + bob, 11 + bob):
-        for x in range(cx - 1, cx + 2):
+    # Broad tan jacket and black shirt fill the lower half of the facade.
+    for y in range(9, HEIGHT):
+        for x in range(2, 7):
             pixel(frame, x, y, COAT)
-    line(frame, cx, 6 + bob, cx, 10 + bob, COAT_LIGHT)
-    pixel(frame, cx, 7 + bob, SHIRT)
-    pixel(frame, cx, 8 + bob, SHIRT)
+    for y, half_width in ((9, 2), (10, 1), (11, 1), (12, 0), (13, 0)):
+        for x in range(4 - half_width, 5 + half_width):
+            pixel(frame, x, y, SHIRT)
+    line(frame, 3, 9, 3, 16, COAT_LIGHT)
 
-    # Four poses create Rick's familiar side-to-side dance.
-    if phase == 0:
-        line(frame, cx - 1, 6 + bob, cx - 3, 9 + bob, COAT)
-        line(frame, cx + 1, 6 + bob, cx + 2, 8 + bob, COAT)
-        pixel(frame, cx - 3, 10 + bob, SKIN)
-        pixel(frame, cx + 2, 9 + bob, SKIN)
-    elif phase == 1:
-        line(frame, cx - 1, 6 + bob, cx - 3, 6 + bob, COAT)
-        line(frame, cx + 1, 6 + bob, cx + 2, 9 + bob, COAT)
-        pixel(frame, cx - 3, 6 + bob, SKIN)
-        pixel(frame, cx + 2, 10 + bob, SKIN)
-    elif phase == 2:
-        line(frame, cx - 1, 6 + bob, cx - 2, 9 + bob, COAT)
-        line(frame, cx + 1, 6 + bob, cx + 3, 7 + bob, COAT)
-        pixel(frame, cx - 2, 10 + bob, SKIN)
-        pixel(frame, cx + 3, 7 + bob, SKIN)
+    # Exaggerated arms are readable at a distance and create the dance motion.
+    if phase in (0, 2):
+        line(frame, 2, 10, 0, 7 if phase == 0 else 13, COAT_LIGHT)
+        line(frame, 6, 10, 7, 13 if phase == 0 else 8, COAT)
     else:
-        line(frame, cx - 1, 6 + bob, cx - 3, 8 + bob, COAT)
-        line(frame, cx + 1, 6 + bob, cx + 3, 10 + bob, COAT)
-        pixel(frame, cx - 3, 9 + bob, SKIN)
-        pixel(frame, cx + 3, 11 + bob, SKIN)
-
-    hip_y = 11 + bob
-    pixel(frame, cx - 1, hip_y, TROUSERS)
-    pixel(frame, cx, hip_y, TROUSERS)
-    pixel(frame, cx + 1, hip_y, TROUSERS)
-    if phase in (0, 3):
-        line(frame, cx - 1, hip_y, cx - 2, 15, TROUSERS)
-        line(frame, cx + 1, hip_y, cx + 2, 15, TROUSERS)
-        pixel(frame, cx - 3, 16, SHOE)
-        pixel(frame, cx - 2, 16, SHOE)
-        pixel(frame, cx + 2, 16, SHOE)
-    else:
-        line(frame, cx - 1, hip_y, cx, 15, TROUSERS)
-        line(frame, cx + 1, hip_y, cx + 3, 14, TROUSERS)
-        pixel(frame, cx, 16, SHOE)
-        pixel(frame, cx + 3, 15, SHOE)
-        pixel(frame, cx + 4, 15, SHOE)
+        line(frame, 2, 10, 1, 13 if phase == 1 else 8, COAT)
+        line(frame, 6, 10, 8, 7 if phase == 1 else 13, COAT_LIGHT)
 
 
 def draw_microphone(frame: Frame, phase: int) -> None:
-    x = 7 if phase in (0, 1) else 6
+    x = 7
+    pixel(frame, x, 4, MIC)
+    pixel(frame, x + 1, 4, MIC)
     pixel(frame, x, 5, MIC)
-    pixel(frame, x + 1, 5, (85, 92, 110))
-    line(frame, x, 6, x, 14, (70, 75, 90))
-    line(frame, x - 1, 15, x + 1, 15, (70, 75, 90))
+    line(frame, x, 6, x, 15, (85, 92, 110))
+    line(frame, x - 1, 16, x + 1, 16, (85, 92, 110))
 
 
 def frames(fps: float) -> Iterator[Frame]:
     frame_number = 0
     while True:
-        result = stage(frame_number)
-        phase = (frame_number // max(1, round(fps * 0.28))) % 4
-        draw_microphone(result, phase)
-        draw_rick(result, phase)
+        dance_frames = max(4, round(fps * 2.0))
+        card_frames = max(2, round(fps * 1.0))
+        cycle_frames = dance_frames + card_frames * len(WORD_CARDS)
+        cycle_position = frame_number % cycle_frames
+        if cycle_position < dance_frames:
+            result = stage(frame_number)
+            phase = (frame_number // max(1, round(fps * 0.28))) % 4
+            draw_microphone(result, phase)
+            draw_rick(result, phase)
+        else:
+            card_index = (cycle_position - dance_frames) // card_frames
+            word, background = WORD_CARDS[card_index]
+            result = word_card(word, background)
         yield result
         frame_number += 1
 
